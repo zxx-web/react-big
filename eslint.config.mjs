@@ -29,8 +29,11 @@ export default defineConfig([
 	{
 		files: ['**/*.{ts,mts,cts}'],
 		rules: {
+			// 允许在 switch/case 语句中声明变量（不强制加花括号）
 			'no-case-declarations': 'off',
+			// 允许常量条件（比如 while(true) 这样的代码）
 			'no-constant-condition': 'off',
+			// 允许 typescript 注释指令（@ts-expect-error/@ts-ignore 等）
 			'@typescript-eslint/ban-ts-comment': 'off'
 		}
 	},
