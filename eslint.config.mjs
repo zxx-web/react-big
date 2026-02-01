@@ -34,7 +34,8 @@ export default defineConfig([
 			// 允许常量条件（比如 while(true) 这样的代码）
 			'no-constant-condition': 'off',
 			// 允许 typescript 注释指令（@ts-expect-error/@ts-ignore 等）
-			'@typescript-eslint/ban-ts-comment': 'off'
+			'@typescript-eslint/ban-ts-comment': 'off',
+			'@typescript-eslint/no-explicit-any': 'off'
 		}
 	},
 
