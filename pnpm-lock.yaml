@@ -21,6 +21,9 @@ importers:
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.2
+      '@rollup/plugin-alias':
+        specifier: 4.0.2
+        version: 4.0.2(rollup@4.57.0)
       '@rollup/plugin-commonjs':
         specifier: ^29.0.0
         version: 29.0.0(rollup@4.57.0)
@@ -69,6 +72,18 @@ importers:
 
   packages/react:
     dependencies:
+      shared:
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/react-dom:
+    dependencies:
+      react:
+        specifier: workspace:*
+        version: link:../react
+      react-reconciler:
+        specifier: workspace:*
+        version: link:../react-reconciler
       shared:
         specifier: workspace:*
         version: link:../shared
@@ -228,6 +243,15 @@ packages:
   '@pkgr/core@0.2.9':
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==, tarball: https://registry.npmmirror.com/@pkgr/core/-/core-0.2.9.tgz}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
+
+  '@rollup/plugin-alias@4.0.2':
+    resolution: {integrity: sha512-1hv7dBOZZwo3SEupxn4UA2N0EDThqSSS+wI1St1TNTBtOZvUchyIClyHcnDcjjrReTPZ47Faedrhblv4n+T5UQ==, tarball: https://registry.npmmirror.com/@rollup/plugin-alias/-/plugin-alias-4.0.2.tgz}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0||^3.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
 
   '@rollup/plugin-commonjs@29.0.0':
     resolution: {integrity: sha512-U2YHaxR2cU/yAiwKJtJRhnyLk7cifnQw0zUpISsocBDoHDJn+HTV74ABqnwr5bEgWUwFZC9oFL6wLe21lHu5eQ==, tarball: https://registry.npmmirror.com/@rollup/plugin-commonjs/-/plugin-commonjs-29.0.0.tgz}
@@ -1161,6 +1185,10 @@ packages:
   signal-exit@3.0.7:
     resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==, tarball: https://registry.npmmirror.com/signal-exit/-/signal-exit-3.0.7.tgz}
 
+  slash@4.0.0:
+    resolution: {integrity: sha512-3dOsAHXXUkQTpOYcoAxLIorMTp4gIQr5IW3iVb7A7lFIp0VHhnynm9izx6TssdrIcVIESAlVjtnO2K8bg+Coew==, tarball: https://registry.npmmirror.com/slash/-/slash-4.0.0.tgz}
+    engines: {node: '>=12'}
+
   sort-keys@2.0.0:
     resolution: {integrity: sha512-/dPCrG1s3ePpWm6yBbxZq5Be1dXGLyLn9Z791chDC3NFrpkVbWGzkBwPN1knaciexFXgRJ7hzdnwZ4stHSDmjg==, tarball: https://registry.npmmirror.com/sort-keys/-/sort-keys-2.0.0.tgz}
     engines: {node: '>=4'}
@@ -1500,6 +1528,12 @@ snapshots:
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
   '@pkgr/core@0.2.9': {}
+
+  '@rollup/plugin-alias@4.0.2(rollup@4.57.0)':
+    dependencies:
+      slash: 4.0.0
+    optionalDependencies:
+      rollup: 4.57.0
 
   '@rollup/plugin-commonjs@29.0.0(rollup@4.57.0)':
     dependencies:
@@ -2362,6 +2396,8 @@ snapshots:
   shebang-regex@3.0.0: {}
 
   signal-exit@3.0.7: {}
+
+  slash@4.0.0: {}
 
   sort-keys@2.0.0:
     dependencies:
