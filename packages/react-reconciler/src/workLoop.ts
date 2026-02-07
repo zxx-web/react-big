@@ -119,6 +119,7 @@ export function createWorkInProgress(
 		wip.pendingProps = pendingProps;
 		wip.flags = noFLags;
 		wip.subtreeFlags = noFLags;
+		wip.deletions = null;
 	}
 	wip.type = current.type;
 	wip.updateQueue = current.updateQueue;

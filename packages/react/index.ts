@@ -11,7 +11,6 @@ export const useState: Dispatcher['useState'] = (initialState) => {
 export const __SECRET_INTERNALS__ = {
 	currentDispatcher
 };
-export default {
-	version: '1.0.0',
-	createElement: jsxDEV
-};
+
+export const version = '1.0.0';
+export const createElement = jsxDEV;
