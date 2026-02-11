@@ -12,7 +12,14 @@ function App() {
 					<li key={4}>4</li>,
 					<li key={2}>2</li>
 				];
-	return <ul onClick={() => setNum(num + 1)}>{arr}</ul>;
+	return (
+		<ul onClick={() => setNum(num + 1)}>
+			<>
+				<li key={6}>6</li>
+			</>
+			{arr}
+		</ul>
+	);
 }
 
 createRoot(document.getElementById('root')!).render(<App />);
