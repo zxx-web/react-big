@@ -85,7 +85,7 @@ function appendAllChildren(parent: Container, wip: FiberNode) {
 		node = node.sibling;
 	}
 }
-
+// 将子树的flags冒泡到当前节点
 function bubbleProperties(wip: FiberNode) {
 	let subtreeFlags = noFLags;
 	let child = wip.child;
