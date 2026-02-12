@@ -79,7 +79,7 @@ function recordHostChildrenToDelete(
 	childrenToDelete: FiberNode[],
 	unmountFiber: FiberNode
 ) {
-	let lastOne = childrenToDelete[childrenToDelete.length - 1];
+	const lastOne = childrenToDelete[childrenToDelete.length - 1];
 	if (!lastOne) {
 		childrenToDelete.push(unmountFiber);
 	} else {
@@ -94,7 +94,7 @@ function recordHostChildrenToDelete(
 }
 
 const commitDeletion = (childToDelete: FiberNode) => {
-	let rootHostChildren: FiberNode[] = [];
+	const rootHostChildren: FiberNode[] = [];
 	commitNestedComponent(childToDelete, (unmountFiber) => {
 		switch (unmountFiber.tag) {
 			case HostComponent:

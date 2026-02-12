@@ -13,7 +13,13 @@ function App() {
 					<li key={2}>2</li>
 				];
 	return (
-		<ul onClick={() => setNum(num + 1)}>
+		<ul
+			onClick={() => {
+				setNum((num) => num + 1);
+				setNum((num) => num + 1);
+				setNum((num) => num + 1);
+			}}
+		>
 			<>
 				<li key={6}>6</li>
 			</>
