@@ -11,6 +11,9 @@ importers:
       '@rollup/plugin-replace':
         specifier: ^6.0.3
         version: 6.0.3(rollup@4.57.0)
+      scheduler:
+        specifier: ^0.27.0
+        version: 0.27.0
     devDependencies:
       '@commitlint/cli':
         specifier: ^20.3.1
@@ -33,6 +36,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.13)
+      '@types/scheduler':
+        specifier: ^0.26.0
+        version: 0.26.0
       '@typescript-eslint/parser':
         specifier: ^8.53.1
         version: 8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
@@ -719,6 +725,9 @@ packages:
 
   '@types/react@19.2.13':
     resolution: {integrity: sha512-KkiJeU6VbYbUOp5ITMIc7kBfqlYkKA5KhEHVrGMmUUMt7NeaZg65ojdPk+FtNrBAOXNVM5QM72jnADjM+XVRAQ==, tarball: https://registry.npmmirror.com/@types/react/-/react-19.2.13.tgz}
+
+  '@types/scheduler@0.26.0':
+    resolution: {integrity: sha512-WFHp9YUJQ6CKshqoC37iOlHnQSmxNc795UhB26CyBBttrN9svdIrUjl/NjnNmfcwtncN0h/0PPAFWv9ovP8mLA==, tarball: https://registry.npmmirror.com/@types/scheduler/-/scheduler-0.26.0.tgz}
 
   '@typescript-eslint/eslint-plugin@8.53.1':
     resolution: {integrity: sha512-cFYYFZ+oQFi6hUnBTbLRXfTJiaQtYE3t4O692agbBl+2Zy+eqSKWtPjhPXJu1G7j4RLjKgeJPDdq3EqOwmX5Ag==, tarball: https://registry.npmmirror.com/@typescript-eslint/eslint-plugin/-/eslint-plugin-8.53.1.tgz}
@@ -1509,6 +1518,9 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
+  scheduler@0.27.0:
+    resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==, tarball: https://registry.npmmirror.com/scheduler/-/scheduler-0.27.0.tgz}
+
   semver@5.7.2:
     resolution: {integrity: sha512-cBznnQ9KjJqU67B52RMC65CMarK2600WFnbkcaiwWq3xy/5haFJlshgnpjovMVJ+Hff49d8GEn0b87C5pDQ10g==, tarball: https://registry.npmmirror.com/semver/-/semver-5.7.2.tgz}
     hasBin: true
@@ -2292,6 +2304,8 @@ snapshots:
   '@types/react@19.2.13':
     dependencies:
       csstype: 3.2.3
+
+  '@types/scheduler@0.26.0': {}
 
   '@typescript-eslint/eslint-plugin@8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
@@ -3100,6 +3114,8 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.57.0
       '@rollup/rollup-win32-x64-msvc': 4.57.0
       fsevents: 2.3.3
+
+  scheduler@0.27.0: {}
 
   semver@5.7.2: {}
 

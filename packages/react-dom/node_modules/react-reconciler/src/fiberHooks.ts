@@ -11,6 +11,8 @@ import {
 import { Action } from 'shared/ReactTypes';
 import { scheduleUpdateOnFiber } from './workLoop';
 import { Lane, NoLane, requestUpdateLane } from './fiberLanes';
+import { FLags, passiveEffect } from './fiberFlags';
+import { hookHasEffect, passive } from './hookEffectTags';
 
 let currentlyRenderFiber: FiberNode | null = null;
 let workInProgressHook: Hook | null = null;
@@ -22,11 +24,25 @@ interface Hook {
 	updateQueue: unknown;
 	next: Hook | null;
 }
+export interface Effect {
+	tag: FLags;
+	create: EffectCallback | void;
+	destroy: EffectCallback | void;
+	deps: EffectDeps;
+	next: Effect | null;
+}
+export interface FCUpdateQueue<T> extends UpdateQueue<T> {
+	lastEffect: Effect | null;
+}
+type EffectCallback = () => void;
+type EffectDeps = any[] | null;
 export function renderWithHooks(wip: FiberNode, lane: Lane) {
 	currentlyRenderFiber = wip;
 	renderLane = lane;
+	// 重置 hooks 链表
 	wip.memoizedState = null;
-
+	// 重置 effects 链表
+	wip.updateQueue = null;
 	const current = wip.alternate;
 
 	if (current !== null) {
@@ -45,13 +61,102 @@ export function renderWithHooks(wip: FiberNode, lane: Lane) {
 }
 
 const HooksDisptcherOnMount: Dispatcher = {
-	useState: mountState
+	useState: mountState,
+	useEffect: mountEffect
 };
 
 const HooksDisptcherOnUpdate: Dispatcher = {
-	useState: updateState
+	useState: updateState,
+	useEffect: updateEffect
 };
 
+function mountEffect(create: EffectCallback | void, deps: EffectDeps | void) {
+	const hook = mountWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	(currentlyRenderFiber as FiberNode).flags |= passiveEffect;
+	hook.memoizedState = pushEffect(
+		passive | hookHasEffect,
+		create,
+		undefined,
+		nextDeps
+	);
+}
+function updateEffect(create: EffectCallback | void, deps: EffectDeps | void) {
+	const hook = updateWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	let destroy: EffectCallback | void;
+	if (currentHook !== null) {
+		const prevEffect = currentHook.memoizedState as Effect;
+		destroy = prevEffect.destroy;
+
+		if (nextDeps !== null) {
+			const prevDeps = prevEffect.deps;
+			if (areHookInputsEqual(nextDeps, prevDeps)) {
+				pushEffect(passive, create, destroy, nextDeps);
+				return;
+			}
+		}
+		(currentlyRenderFiber as FiberNode).flags |= passiveEffect;
+		hook.memoizedState = pushEffect(
+			passive | hookHasEffect,
+			create,
+			destroy,
+			nextDeps
+		);
+	}
+}
+function areHookInputsEqual(nextDeps: EffectDeps, prevDeps: EffectDeps) {
+	if (nextDeps === null || prevDeps === null) {
+		return false;
+	}
+	for (let i = 0; i < nextDeps.length && i < prevDeps.length; i++) {
+		if (Object.is(prevDeps[i], nextDeps[i])) {
+			continue;
+		}
+		return false;
+	}
+	return true;
+}
+function pushEffect(
+	hookFlags: FLags,
+	create: EffectCallback | void,
+	destroy: EffectCallback | void,
+	deps: EffectDeps
+): Effect {
+	const effect: Effect = {
+		tag: hookFlags,
+		create,
+		destroy,
+		deps,
+		next: null
+	};
+	const fiber = currentlyRenderFiber as FiberNode;
+	const updateQueue = fiber.updateQueue as FCUpdateQueue<any>;
+	if (updateQueue === null) {
+		const updateQueue = createFCUpdateQueue();
+		fiber.updateQueue = updateQueue;
+		effect.next = effect;
+		updateQueue.lastEffect = effect;
+	} else {
+		const lastEffect = updateQueue.lastEffect;
+		if (lastEffect === null) {
+			effect.next = effect;
+			updateQueue.lastEffect = effect;
+		} else {
+			const firstEffect = lastEffect.next;
+			lastEffect.next = effect;
+			effect.next = firstEffect;
+			updateQueue.lastEffect = effect;
+		}
+	}
+	return effect;
+}
+
+function createFCUpdateQueue<T>() {
+	const updateQueue = createUpdateQueue<T>() as FCUpdateQueue<T>;
+	updateQueue.lastEffect = null;
+	return updateQueue;
+}
 function mountState<T>(initialState: () => T | T): [T, Dispatch<T>] {
 	const hook = mountWorkInProgressHook();
 	let memoizedState;
@@ -73,6 +178,7 @@ function updateState<T>(): [T, Dispatch<T>] {
 
 	const queue = hook.updateQueue as UpdateQueue<T>;
 	const pending = queue.shared.pending;
+	queue.shared.pending = null;
 	if (pending !== null) {
 		const { memoizedState } = processUpdateQueue(
 			hook.memoizedState,
