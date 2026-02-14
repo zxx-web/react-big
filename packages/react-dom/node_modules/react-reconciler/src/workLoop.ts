@@ -13,6 +13,7 @@ import {
 import {
 	getHighestPriorityLane,
 	Lane,
+	lanesToSchedulerPriority,
 	markRootFinished,
 	mergeLanes,
 	NoLane,
@@ -22,14 +23,23 @@ import { flushSyncCallback, scheduleSyncCallback } from './syncTaskQueue';
 import { scheduleMicroTask } from 'hostConfig';
 import {
 	unstable_scheduleCallback as scheduleCallback,
-	unstable_NormalPriority as normalPriority
+	unstable_NormalPriority as normalPriority,
+	unstable_shouldYield,
+	unstable_cancelCallback
 } from 'scheduler';
 import { hookHasEffect, passive } from './hookEffectTags';
 
 let workInProgress: FiberNode | null = null;
 let wipRootRenderLane: Lane = NoLane;
 let rootDoesHasPassiveEffects: boolean = false;
+
+type RootExistStatus = number;
+const RootInComplete: RootExistStatus = 1;
+const RootCompleted: RootExistStatus = 2;
+
 function prepareFreshStack(root: FiberRootNode, lane: Lane) {
+	root.finishLane = NoLane;
+	root.finishedWork = null;
 	workInProgress = createWorkInProgress(root.current, {});
 	wipRootRenderLane = lane;
 }
@@ -42,20 +52,42 @@ export function scheduleUpdateOnFiber(fiber: FiberNode, lane: Lane) {
 
 function ensureRootIsScheduled(root: FiberRootNode) {
 	const updateLane = getHighestPriorityLane(root.pendingLanes);
+	const existingCallback = root.callbackNode;
 	if (updateLane === NoLane) {
+		if (existingCallback !== null) {
+			unstable_cancelCallback(existingCallback);
+		}
+		root.callbackNode = null;
+		root.callbackPriority = NoLane;
 		return;
 	}
+	const curPriority = updateLane;
+	const prevPriority = root.callbackPriority;
+	if (curPriority === prevPriority) {
+		return;
+	}
+	if (existingCallback !== null) {
+		unstable_cancelCallback(existingCallback);
+	}
+	let newCallbackNode = null;
 	if (updateLane === SyncLane) {
 		if (__DEV__) {
 			console.warn('在微任务中调度，优先级：', updateLane);
 		}
-		scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root, updateLane));
+		scheduleSyncCallback(performSyncWorkOnRoot.bind(null, root));
 		scheduleMicroTask(flushSyncCallback);
 	} else {
 		if (__DEV__) {
 			console.warn('在宏任务中调度，优先级：', updateLane);
 		}
+		const schedulerPriority = lanesToSchedulerPriority(updateLane);
+		newCallbackNode = scheduleCallback(
+			schedulerPriority,
+			performConcurrentWorkOnRoot.bind(null, root)
+		);
 	}
+	root.callbackNode = newCallbackNode;
+	root.callbackPriority = curPriority;
 }
 function markRootUpdate(root: FiberRootNode, lane: Lane) {
 	root.pendingLanes = mergeLanes(root.pendingLanes, lane);
@@ -74,16 +106,65 @@ function markUpdateFromFiberToRoot(fiber: FiberNode) {
 	}
 	return null;
 }
-function performSyncWorkOnRoot(root: FiberRootNode, lane: Lane) {
+function performConcurrentWorkOnRoot(
+	root: FiberRootNode,
+	didTimeout: boolean
+): any {
+	const curCallback = root.callbackNode;
+	const didFlushPassiveEffect = flushPassiveEffects(root.pendingPassiveEffects);
+	if (didFlushPassiveEffect) {
+		if (root.callbackNode !== curCallback) {
+			return null;
+		}
+	}
+	const lane = getHighestPriorityLane(root.pendingLanes);
+	const curCallbackNode = root.callbackNode;
+	if (lane === NoLane) {
+		return;
+	}
+	const needSync = lane === SyncLane || didTimeout;
+	const existStatus = renderRoot(root, lane, !needSync);
+	ensureRootIsScheduled(root);
+	if (existStatus === RootInComplete) {
+		if (root.callbackNode !== curCallbackNode) {
+			return null;
+		}
+		return performConcurrentWorkOnRoot.bind(null, root);
+	}
+	if (existStatus === RootCompleted) {
+		const finishedWork = root.current.alternate;
+		root.finishedWork = finishedWork;
+		root.finishLane = lane;
+		wipRootRenderLane = NoLane;
+		commitRoot(root);
+	}
+}
+function performSyncWorkOnRoot(root: FiberRootNode) {
 	const nextLane = getHighestPriorityLane(root.pendingLanes);
 	if (nextLane !== SyncLane) {
 		ensureRootIsScheduled(root);
 		return;
 	}
-	prepareFreshStack(root, lane);
+	const existStatus = renderRoot(root, nextLane, false);
+	if (existStatus === RootCompleted) {
+		const finishedWork = root.current.alternate;
+		root.finishedWork = finishedWork;
+		root.finishLane = nextLane;
+		wipRootRenderLane = NoLane;
+		commitRoot(root);
+	}
+}
+function renderRoot(root: FiberRootNode, lane: Lane, shouldTimeSlice: boolean) {
+	if (lane !== wipRootRenderLane) {
+		prepareFreshStack(root, lane);
+	}
 	do {
 		try {
-			workLoop();
+			if (shouldTimeSlice) {
+				workLoopConcurrent();
+			} else {
+				workLoopSync();
+			}
 			break;
 		} catch (error) {
 			if (__DEV__) {
@@ -92,14 +173,16 @@ function performSyncWorkOnRoot(root: FiberRootNode, lane: Lane) {
 			workInProgress = null;
 		}
 	} while (true);
-
-	const finishedWork = root.current.alternate;
-	root.finishedWork = finishedWork;
-	root.finishLane = lane;
-	wipRootRenderLane = NoLane;
-	commitRoot(root);
+	// 中断执行
+	if (shouldTimeSlice && workInProgress !== null) {
+		return RootInComplete;
+	}
+	// render阶段执行完
+	if (!shouldTimeSlice && workInProgress !== null && __DEV__) {
+		console.warn('render阶段结束wip不应该不是null');
+	}
+	return RootCompleted;
 }
-
 function commitRoot(root: FiberRootNode) {
 	const finishedWork = root.finishedWork;
 	if (finishedWork === null) {
@@ -147,25 +230,34 @@ function commitRoot(root: FiberRootNode) {
 	ensureRootIsScheduled(root);
 }
 function flushPassiveEffects(pendingPassiveEffects: PendingPassiveEffects) {
+	let didFlushPassiveEffect = false;
 	pendingPassiveEffects.unmount.forEach((effect) => {
+		didFlushPassiveEffect = true;
 		commitHookEffectListUnmount(passive, effect);
 	});
 	pendingPassiveEffects.unmount = [];
 	pendingPassiveEffects.update.forEach((effect) => {
+		didFlushPassiveEffect = true;
 		commitHookEffectListDestroy(passive | hookHasEffect, effect);
 	});
 	pendingPassiveEffects.update.forEach((effect) => {
+		didFlushPassiveEffect = true;
 		commitHookEffectListCreate(passive | hookHasEffect, effect);
 	});
 	pendingPassiveEffects.update = [];
 	flushSyncCallback();
+	return didFlushPassiveEffect;
 }
-function workLoop() {
+function workLoopSync() {
 	while (workInProgress !== null) {
 		performUnitOfWork(workInProgress);
 	}
 }
-
+function workLoopConcurrent() {
+	while (workInProgress !== null && !unstable_shouldYield()) {
+		performUnitOfWork(workInProgress);
+	}
+}
 function performUnitOfWork(fiber: FiberNode) {
 	const next = beginWork(fiber, wipRootRenderLane);
 	fiber.memoizedProps = fiber.pendingProps;
