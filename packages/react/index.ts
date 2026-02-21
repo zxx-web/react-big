@@ -21,6 +21,10 @@ export const useRef: Dispatcher['useRef'] = (initialValue) => {
 	const dispatcher = resolveDispatcher();
 	return dispatcher.useRef(initialValue);
 };
+export const useContext: Dispatcher['useContext'] = (context) => {
+	const dispatcher = resolveDispatcher();
+	return dispatcher.useContext(context);
+};
 export const __SECRET_INTERNALS__ = {
 	currentDispatcher,
 	CurrentBatchConfig
@@ -28,3 +32,4 @@ export const __SECRET_INTERNALS__ = {
 
 export const version = '1.0.0';
 export const createElement = jsxDEV;
+export * from './src/context';
