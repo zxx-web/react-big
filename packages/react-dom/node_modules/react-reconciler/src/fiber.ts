@@ -41,7 +41,7 @@ export class FiberNode {
 		this.sibling = null;
 		this.child = null;
 		this.index = 0;
-		this.ref = null;
+		this.ref = { current: null };
 		this.alternate = null;
 		this.flags = noFLags;
 		this.subtreeFlags = noFLags;
@@ -80,7 +80,7 @@ export class FiberRootNode {
 }
 
 export function createFiberFromElement(element: ReactElementType): FiberNode {
-	const { type, key, props } = element;
+	const { type, key, props, ref } = element;
 	let fiberTag: WorkTag = FunctionComponent;
 	if (typeof type === 'string') {
 		fiberTag = HostComponent;
@@ -89,6 +89,7 @@ export function createFiberFromElement(element: ReactElementType): FiberNode {
 	}
 	const fiber = new FiberNode(fiberTag, props, key);
 	fiber.type = type;
+	fiber.ref = ref;
 	return fiber;
 }
 

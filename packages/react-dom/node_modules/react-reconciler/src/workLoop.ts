@@ -8,6 +8,7 @@ import {
 	commitHookEffectListCreate,
 	commitHookEffectListDestroy,
 	commitHookEffectListUnmount,
+	commitLayoutEffects,
 	commitMutationEffects
 } from './commitWork';
 import {
@@ -223,6 +224,7 @@ function commitRoot(root: FiberRootNode) {
 		commitMutationEffects(finishedWork, root);
 		root.current = finishedWork;
 		// layout
+		commitLayoutEffects(finishedWork, root);
 	} else {
 		root.current = finishedWork;
 	}
@@ -307,5 +309,6 @@ export function createWorkInProgress(
 	wip.child = current.child;
 	wip.memoizedProps = current.memoizedProps;
 	wip.memoizedState = current.memoizedState;
+	wip.ref = current.ref;
 	return wip;
 }
