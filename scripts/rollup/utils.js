@@ -18,7 +18,11 @@ export function getPackageJson(pkgName) {
 
 export function getBaseRollupPlugins({
 	alias = { __DEV__: true, preventAssignment: true },
-	tsOptions
+	tsOptions = {
+		tsconfigOverride: {
+			include: [`${pkgPath}/**/*`]
+		}
+	}
 } = {}) {
 	return [replace(alias), commonjs(), typescript(tsOptions)];
 }

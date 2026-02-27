@@ -1,7 +1,7 @@
 import { ReactContext } from 'shared/ReactTypes';
 
 let prevContextValue: any = null;
-let prevContextValueStack: any[] = [];
+const prevContextValueStack: any[] = [];
 
 export function pushProvider<T>(context: ReactContext<T>, newValue: T) {
 	prevContextValueStack.push(prevContextValue);

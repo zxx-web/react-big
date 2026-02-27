@@ -205,7 +205,6 @@ function updateState<T>(): [T, Dispatch<T>] {
 
 	const queue = hook.updateQueue as UpdateQueue<T>;
 	const baseState = hook.baseState;
-
 	const pending = queue.shared.pending;
 	const current = currentHook as Hook;
 	let baseQueue = current.baseQueue;
@@ -220,6 +219,7 @@ function updateState<T>(): [T, Dispatch<T>] {
 			pending.next = baseFirst;
 		}
 		baseQueue = pending;
+		// 貌似有点多余
 		current.baseQueue = baseQueue;
 		queue.shared.pending = null;
 	}
@@ -233,7 +233,6 @@ function updateState<T>(): [T, Dispatch<T>] {
 		hook.baseState = newBaseState;
 		hook.baseQueue = newBaseQueue;
 	}
-
 	return [hook.memoizedState, queue.dispatch as Dispatch<T>];
 }
 function mountTransition(): [boolean, (callback: () => void) => void] {

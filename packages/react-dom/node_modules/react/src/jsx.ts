@@ -1,4 +1,8 @@
-import { REACT_ELEMENT_TYPE, REACT_FRAGMENT_TYPE } from 'shared/ReactSymbols';
+import {
+	REACT_ELEMENT_TYPE,
+	REACT_FRAGMENT_TYPE,
+	REACT_SUSPENSE_TYPE
+} from 'shared/ReactSymbols';
 import type {
 	Type,
 	Key,
@@ -21,7 +25,6 @@ const ReactElement = function (
 		props,
 		__mark: 'Zxx'
 	};
-
 	return element;
 };
 
@@ -31,7 +34,7 @@ export const jsx = function (
 	...maybeChildren: any
 ) {
 	let key: Key = null;
-	let ref: Ref = null;
+	let ref: Ref = { current: null };
 	const props: Props = {};
 	for (const prop in config) {
 		const val = config[prop];
@@ -88,3 +91,4 @@ export const jsxDEV = function (type: ElementType, config: any) {
 };
 
 export const Fragment = REACT_FRAGMENT_TYPE;
+export const Suspense = REACT_SUSPENSE_TYPE;

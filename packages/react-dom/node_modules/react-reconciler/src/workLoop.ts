@@ -90,6 +90,7 @@ function ensureRootIsScheduled(root: FiberRootNode) {
 	root.callbackNode = newCallbackNode;
 	root.callbackPriority = curPriority;
 }
+
 function markRootUpdate(root: FiberRootNode, lane: Lane) {
 	root.pendingLanes = mergeLanes(root.pendingLanes, lane);
 }

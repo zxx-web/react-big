@@ -182,6 +182,15 @@ function childReconciler(shouldTrackEffects: boolean) {
 			}
 			return new FiberNode(HostText, { content: element + '' }, null);
 		}
+		if (Array.isArray(element)) {
+			return updateFragment(
+				returnFiber,
+				before,
+				element,
+				keyToUse,
+				existingChildren
+			);
+		}
 		if (typeof element === 'object' && element !== null) {
 			switch (element.$$typeof) {
 				case REACT_ELEMENT_TYPE:
@@ -202,15 +211,6 @@ function childReconciler(shouldTrackEffects: boolean) {
 					}
 					return createFiberFromElement(element);
 			}
-		}
-		if (Array.isArray(element)) {
-			return updateFragment(
-				returnFiber,
-				before,
-				element,
-				keyToUse,
-				existingChildren
-			);
 		}
 		return null;
 	}

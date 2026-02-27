@@ -30,7 +30,7 @@ export function createUpdateQueue<T>(): UpdateQueue<T> {
 		dispatch: null
 	} as UpdateQueue<T>;
 }
-
+// pending --> last update --> first update --> second update --> ... --> last update
 export function enqueueUpdate<T>(
 	updateQueue: UpdateQueue<T>,
 	update: Update<T>
@@ -84,7 +84,7 @@ export function processUpdateQueue<T>(
 				}
 				const action = pending.action;
 				if (action instanceof Function) {
-					newState = action(baseState);
+					newState = action(newState);
 				} else {
 					newState = action;
 				}
