@@ -37,3 +37,4 @@ export const __SECRET_INTERNALS__ = {
 export const version = '1.0.0';
 export const createElement = jsxDEV;
 export * from './src/context';
+export { REACT_SUSPENSE_TYPE as Suspense } from 'shared/ReactSymbols';
