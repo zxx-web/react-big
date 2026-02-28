@@ -67,3 +67,21 @@ export const scheduleMicroTask =
 			? (callback: (...args: any) => void) =>
 					Promise.resolve(null).then(callback)
 			: setTimeout;
+
+export function hideInstance(instance: Instance) {
+	const style = (instance as HTMLElement).style;
+	style.setProperty('display', 'none', 'important');
+}
+
+export function unHideInstance(instance: Instance) {
+	const style = (instance as HTMLElement).style;
+	style.setProperty('display', '');
+}
+
+export function hideTextInstance(instance: TextInstance) {
+	instance.textContent = '';
+}
+
+export function unHideTextInstance(instance: TextInstance, text: string) {
+	instance.textContent = text;
+}

@@ -2,9 +2,13 @@ import {
 	appendChildToContainer,
 	commitUpdate,
 	Container,
+	hideInstance,
+	hideTextInstance,
 	insertChildToContainer,
 	Instance,
-	removeChild
+	removeChild,
+	unHideInstance,
+	unHideTextInstance
 } from 'hostConfig';
 import { FiberNode, FiberRootNode, PendingPassiveEffects } from './fiber';
 import {
@@ -17,16 +21,19 @@ import {
 	FLags,
 	passiveMask,
 	layoutMask,
-	Ref
+	Ref,
+	Visibility
 } from './fiberFlags';
 import {
 	FunctionComponent,
 	HostComponent,
 	HostRoot,
-	HostText
+	HostText,
+	OffscreenComponent
 } from './workTag';
 import { Effect, FCUpdateQueue } from './fiberHooks';
 import { hookHasEffect } from './hookEffectTags';
+import { noop } from './thenable';
 
 let nextEffect: FiberNode | null = null;
 const commitEffects = (
@@ -86,7 +93,83 @@ const commitMutationEffectsOnFiber = (
 	if ((flags & Ref) !== noFLags && tag === HostComponent) {
 		safelyDetachRef(fiber);
 	}
+	if ((flags & Visibility) !== noFLags && tag === OffscreenComponent) {
+		const isHidden = fiber.pendingProps.mode === 'hidden';
+		hideOrUnhideAllChildren(fiber, isHidden);
+		fiber.flags &= ~Visibility;
+	}
 };
+
+function hideOrUnhideAllChildren(fiber: FiberNode, isHidden: boolean) {
+	findHostSubtreeRoot(fiber, (hostRoot) => {
+		const instance = hostRoot.stateNode;
+		if (hostRoot.tag === HostComponent) {
+			if (isHidden) {
+				hideInstance(instance);
+			} else {
+				unHideInstance(instance);
+			}
+		} else if (hostRoot.tag === HostText) {
+			if (isHidden) {
+				hideTextInstance(instance);
+			} else {
+				unHideTextInstance(instance, hostRoot.memoizedProps.content);
+			}
+		}
+	});
+}
+
+function findHostSubtreeRoot(
+	fiber: FiberNode,
+	callback: (hostSubtreeRoot: FiberNode) => void
+) {
+	let node = fiber;
+	let hostSubtreeRoot = null;
+	while (true) {
+		if (node.tag === HostComponent) {
+			if (hostSubtreeRoot === null) {
+				hostSubtreeRoot = node;
+				callback(node);
+			}
+		} else if (node.tag === HostText) {
+			if (hostSubtreeRoot === null) {
+				callback(node);
+			}
+		} else if (
+			node.tag === OffscreenComponent &&
+			node.pendingProps.mode === 'hidden' &&
+			node !== fiber
+		) {
+			noop();
+		} else if (node.child !== null) {
+			node.child.return = node;
+			node = node.child;
+			continue;
+		}
+
+		if (node === fiber) {
+			return;
+		}
+
+		while (node.sibling === null) {
+			if (node.return === null || node.return === fiber) {
+				return;
+			}
+
+			if (hostSubtreeRoot === node) {
+				hostSubtreeRoot = null;
+			}
+			node = node.return;
+		}
+
+		if (hostSubtreeRoot === node) {
+			hostSubtreeRoot = null;
+		}
+
+		node.sibling.return = node.return;
+		node = node.sibling;
+	}
+}
 
 function safelyDetachRef(fiber: FiberNode) {
 	const ref = fiber.ref;
