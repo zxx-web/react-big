@@ -2,6 +2,7 @@ import { Dispatch, Dispatcher } from 'react/src/currentDispatcher';
 import { FiberNode } from './fiber';
 import internals from 'shared/internals';
 import {
+	basicStateReducer,
 	createUpdate,
 	createUpdateQueue,
 	enqueueUpdate,
@@ -45,6 +46,7 @@ export interface Effect {
 }
 export interface FCUpdateQueue<T> extends UpdateQueue<T> {
 	lastEffect: Effect | null;
+	lastRenderedState: T;
 }
 type EffectCallback = () => void;
 type EffectDeps = any[] | null;
@@ -204,17 +206,18 @@ function mountState<T>(initialState: (() => T) | T): [T, Dispatch<T>] {
 	}
 	hook.memoizedState = memoizedState;
 	hook.baseState = memoizedState;
-	const queue = createUpdateQueue();
+	const queue = createFCUpdateQueue();
 	hook.updateQueue = queue;
 	const dispatch = dispatchSetState.bind(null, currentlyRenderFiber!, queue);
 	queue.dispatch = dispatch;
+	queue.lastRenderedState = memoizedState;
 	return [memoizedState, dispatch];
 }
 
 function updateState<T>(): [T, Dispatch<T>] {
 	const hook = updateWorkInProgressHook();
 
-	const queue = hook.updateQueue as UpdateQueue<T>;
+	const queue = hook.updateQueue as FCUpdateQueue<T>;
 	const baseState = hook.baseState;
 	const pending = queue.shared.pending;
 	const current = currentHook as Hook;
@@ -251,6 +254,8 @@ function updateState<T>(): [T, Dispatch<T>] {
 		hook.memoizedState = memoizedState;
 		hook.baseState = newBaseState;
 		hook.baseQueue = newBaseQueue;
+
+		queue.lastRenderedState = memoizedState;
 	}
 	return [hook.memoizedState, queue.dispatch as Dispatch<T>];
 }
@@ -314,11 +319,30 @@ function updateWorkInProgressHook(): Hook {
 }
 function dispatchSetState<T>(
 	fiber: FiberNode,
-	updateQueue: UpdateQueue<T>,
+	updateQueue: FCUpdateQueue<T>,
 	action: Action<T>
 ) {
 	const lane = requestUpdateLane();
 	const update = createUpdate(action, lane);
+	// eagerstate
+
+	const current = fiber.alternate;
+	if (
+		fiber.lanes === NoLane &&
+		(current === null || current.lanes === NoLane)
+	) {
+		const currentState = updateQueue.lastRenderedState;
+		const eagerState = basicStateReducer(currentState, action);
+		update.hasEagerState = true;
+		update.eagerState = eagerState;
+		if (Object.is(currentState, eagerState)) {
+			if (__DEV__) {
+				console.warn('命中eagerState', fiber);
+			}
+			enqueueUpdate(updateQueue, update, fiber, NoLane);
+			return;
+		}
+	}
 	enqueueUpdate(updateQueue, update, fiber, lane);
 	scheduleUpdateOnFiber(fiber, lane);
 }

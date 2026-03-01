@@ -7,6 +7,8 @@ export interface Update<T> {
 	action: Action<T>;
 	lane: Lane;
 	next: Update<any> | null;
+	hasEagerState: boolean;
+	eagerState: T | null;
 }
 
 export interface UpdateQueue<T> {
@@ -15,11 +17,18 @@ export interface UpdateQueue<T> {
 	};
 	dispatch: Dispatch<T> | null;
 }
-export function createUpdate<T>(action: Action<T>, lane: Lane): Update<T> {
+export function createUpdate<T>(
+	action: Action<T>,
+	lane: Lane,
+	hasEagerState = false,
+	eagerState = null
+): Update<T> {
 	return {
 		action,
 		lane,
-		next: null
+		next: null,
+		hasEagerState,
+		eagerState
 	};
 }
 
@@ -53,6 +62,14 @@ export function enqueueUpdate<T>(
 	}
 }
 
+export function basicStateReducer<T>(state: T, action: Action<T>): T {
+	if (action instanceof Function) {
+		state = action(state);
+	} else {
+		state = action;
+	}
+	return state;
+}
 export function processUpdateQueue<T>(
 	baseState: T,
 	pendingUpdate: Update<T> | null,
@@ -93,10 +110,10 @@ export function processUpdateQueue<T>(
 					newBaseQueueLast = clone;
 				}
 				const action = pending.action;
-				if (action instanceof Function) {
-					newState = action(newState);
+				if (pending.hasEagerState) {
+					newState = pending.eagerState;
 				} else {
-					newState = action;
+					newState = basicStateReducer(newState, action);
 				}
 			}
 			pending = pending.next as Update<any>;
