@@ -11,11 +11,18 @@ import {
 } from './updateQueue';
 import { Action, ReactContext, Thenable, Usable } from 'shared/ReactTypes';
 import { scheduleUpdateOnFiber } from './workLoop';
-import { Lane, NoLane, requestUpdateLane } from './fiberLanes';
+import {
+	Lane,
+	mergeLanes,
+	NoLane,
+	removeLanes,
+	requestUpdateLane
+} from './fiberLanes';
 import { FLags, passiveEffect } from './fiberFlags';
 import { hookHasEffect, passive } from './hookEffectTags';
 import { REACT_CONTEXT_TYPE } from 'shared/ReactSymbols';
 import { trackUsedThenable } from './thenable';
+import { markWipReceivedUpdate } from './beginWork';
 
 let currentlyRenderFiber: FiberNode | null = null;
 let workInProgressHook: Hook | null = null;
@@ -228,11 +235,19 @@ function updateState<T>(): [T, Dispatch<T>] {
 		queue.shared.pending = null;
 	}
 	if (baseQueue !== null) {
+		const prevState = hook.memoizedState;
 		const {
 			memoizedState,
 			baseQueue: newBaseQueue,
 			baseState: newBaseState
-		} = processUpdateQueue(baseState, baseQueue, renderLane);
+		} = processUpdateQueue(baseState, baseQueue, renderLane, (update) => {
+			const skippedLane = update.lane;
+			const fiber = currentlyRenderFiber as FiberNode;
+			fiber.lanes = mergeLanes(fiber.lanes, skippedLane);
+		});
+		if (!Object.is(prevState, memoizedState)) {
+			markWipReceivedUpdate();
+		}
 		hook.memoizedState = memoizedState;
 		hook.baseState = newBaseState;
 		hook.baseQueue = newBaseQueue;
@@ -304,7 +319,7 @@ function dispatchSetState<T>(
 ) {
 	const lane = requestUpdateLane();
 	const update = createUpdate(action, lane);
-	enqueueUpdate(updateQueue, update);
+	enqueueUpdate(updateQueue, update, fiber, lane);
 	scheduleUpdateOnFiber(fiber, lane);
 }
 function mountWorkInProgressHook() {
@@ -346,4 +361,11 @@ export function resetHooksOnUnwind() {
 	currentlyRenderFiber = null;
 	workInProgressHook = null;
 	currentHook = null;
+}
+
+export function bailoutHook(wip: FiberNode, renderLane: Lane) {
+	const current = wip.alternate as FiberNode;
+	wip.updateQueue = current.updateQueue;
+	wip.flags &= ~passiveEffect;
+	current.lanes = removeLanes(current.lanes, renderLane);
 }

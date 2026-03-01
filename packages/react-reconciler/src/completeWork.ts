@@ -19,6 +19,7 @@ import {
 import { noFLags, Ref, update, Visibility } from './fiberFlags';
 import { popProvider } from './fiberContext';
 import { popSuspenseHandler } from './suspenseContext';
+import { mergeLanes, NoLanes } from './fiberLanes';
 
 function markUpdate(fiber: FiberNode) {
 	fiber.flags |= update;
@@ -119,19 +120,24 @@ function appendAllChildren(parent: Container | Instance, wip: FiberNode) {
 		node = node.sibling;
 	}
 }
-// 将子树的flags冒泡到当前节点
+// 将子树的flags, lanes冒泡到当前节点
 function bubbleProperties(wip: FiberNode) {
 	let subtreeFlags = noFLags;
+	let childLanes = NoLanes;
 	let child = wip.child;
 	while (child !== null) {
 		subtreeFlags |= child.subtreeFlags;
 		subtreeFlags |= child.flags;
-
+		childLanes = mergeLanes(
+			childLanes,
+			mergeLanes(child.lanes, child.childLanes)
+		);
 		child.return = wip;
 		child = child.sibling;
 	}
 
 	wip.subtreeFlags |= subtreeFlags;
+	wip.childLanes = childLanes;
 }
 
 function markRef(fiber: FiberNode) {

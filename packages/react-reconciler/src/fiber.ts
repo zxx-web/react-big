@@ -44,6 +44,8 @@ export class FiberNode {
 	updateQueue: unknown;
 	memoizedState: any;
 	deletions: FiberNode[] | null;
+	lanes: Lanes;
+	childLanes: Lanes;
 	constructor(tag: WorkTag, pendingProps: Props, key: Key) {
 		this.tag = tag;
 		this.pendingProps = pendingProps;
@@ -62,6 +64,8 @@ export class FiberNode {
 		this.updateQueue = null;
 		this.memoizedState = null;
 		this.deletions = null;
+		this.lanes = NoLanes;
+		this.childLanes = NoLanes;
 	}
 }
 export interface PendingPassiveEffects {

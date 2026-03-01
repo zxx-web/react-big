@@ -1,6 +1,7 @@
 import { Dispatch } from 'react/src/currentDispatcher';
 import type { Action } from 'shared/ReactTypes';
-import { isSubsetOfLanes, Lane, NoLane } from './fiberLanes';
+import { isSubsetOfLanes, Lane, mergeLanes, NoLane } from './fiberLanes';
+import { FiberNode } from './fiber';
 
 export interface Update<T> {
 	action: Action<T>;
@@ -33,7 +34,9 @@ export function createUpdateQueue<T>(): UpdateQueue<T> {
 // pending --> last update --> first update --> second update --> ... --> last update
 export function enqueueUpdate<T>(
 	updateQueue: UpdateQueue<T>,
-	update: Update<T>
+	update: Update<T>,
+	fiber: FiberNode,
+	lane: Lane
 ) {
 	const pending = updateQueue.shared.pending;
 	if (pending === null) {
@@ -43,12 +46,18 @@ export function enqueueUpdate<T>(
 		pending.next = update;
 	}
 	updateQueue.shared.pending = update;
+	fiber.lanes = mergeLanes(fiber.lanes, lane);
+	const alternate = fiber.alternate;
+	if (alternate !== null) {
+		alternate.lanes = mergeLanes(alternate.lanes, lane);
+	}
 }
 
 export function processUpdateQueue<T>(
 	baseState: T,
 	pendingUpdate: Update<T> | null,
-	renderLane: Lane
+	renderLane: Lane,
+	onSkipUpdate?: <T>(update: Update<T>) => void
 ): { memoizedState: T; baseState: T; baseQueue: Update<T> | null } {
 	const result: ReturnType<typeof processUpdateQueue<T>> = {
 		memoizedState: baseState,
@@ -67,6 +76,7 @@ export function processUpdateQueue<T>(
 			if (!isSubsetOfLanes(renderLane, updateLane)) {
 				// 优先级不够
 				const clone = createUpdate(pending.action, pending.lane);
+				onSkipUpdate?.(clone);
 				if (newBaseQueueFirst === null) {
 					newBaseQueueFirst = clone;
 					newBaseQueueLast = clone;

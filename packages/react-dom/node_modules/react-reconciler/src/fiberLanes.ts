@@ -73,3 +73,11 @@ export function schedulerPriorityToLane(schedulerPriority: number) {
 	}
 	return NoLane;
 }
+
+export function includeSomeLanes(set: Lanes, subset: Lane | Lanes): boolean {
+	return (set & subset) !== NoLane;
+}
+
+export function removeLanes(set: Lanes, subset: Lane | Lanes): Lanes {
+	return set & ~subset;
+}

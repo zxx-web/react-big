@@ -16,9 +16,13 @@ import {
 	OffscreenComponent,
 	SuspenseComponent
 } from './workTag';
-import { mountChildFibers, reconcileChildFibers } from './childFibers';
-import { renderWithHooks } from './fiberHooks';
-import { Lane } from './fiberLanes';
+import {
+	cloneChildFibers,
+	mountChildFibers,
+	reconcileChildFibers
+} from './childFibers';
+import { bailoutHook, renderWithHooks } from './fiberHooks';
+import { includeSomeLanes, Lane, NoLanes } from './fiberLanes';
 import {
 	childDeletion,
 	DidCapture,
@@ -30,7 +34,43 @@ import { pushProvider } from './fiberContext';
 import { createWorkInProgress } from './workLoop';
 import { pushSuspenseHandler } from './suspenseContext';
 
+let didReceiveUpdate = false;
+
+export function markWipReceivedUpdate() {
+	didReceiveUpdate = true;
+}
+
 export const beginWork = (wip: FiberNode, renderLane: Lane) => {
+	// bailout 策略
+	didReceiveUpdate = false;
+	const current = wip.alternate;
+	if (current !== null) {
+		const oldProps = current.memoizedProps;
+		const newProps = wip.pendingProps;
+		if (oldProps !== newProps || current.type !== wip.type) {
+			didReceiveUpdate = true;
+		} else {
+			const hasScheduledStateOrContext = checkScheduledUpdateOrContext(
+				current,
+				renderLane
+			);
+			if (!hasScheduledStateOrContext) {
+				didReceiveUpdate = false;
+				switch (wip.tag) {
+					case ContextProvider:
+						const providerType = wip.type;
+						const context = providerType._context;
+
+						const newProps = wip.pendingProps;
+						pushProvider(context, newProps.value);
+						break;
+				}
+				return bailoutOnAlreadyFinishedWork(wip, renderLane);
+			}
+		}
+	}
+
+	wip.lanes = NoLanes;
 	switch (wip.tag) {
 		case HostRoot:
 			return updateHostRoot(wip, renderLane);
@@ -56,15 +96,51 @@ export const beginWork = (wip: FiberNode, renderLane: Lane) => {
 	}
 };
 
+function bailoutOnAlreadyFinishedWork(wip: FiberNode, renderLane: Lane) {
+	if (!includeSomeLanes(wip.childLanes, renderLane)) {
+		if (__DEV__) {
+			console.warn('bailout整棵子树', wip);
+		}
+		return null;
+	}
+	if (__DEV__) {
+		console.warn('bailout当前节点', wip);
+	}
+	cloneChildFibers(wip);
+	return wip.child;
+}
+
+function checkScheduledUpdateOrContext(
+	current: FiberNode,
+	renderLane: Lane
+): boolean {
+	const updateLans = current.lanes;
+	if (includeSomeLanes(updateLans, renderLane)) {
+		return true;
+	}
+	return false;
+}
+
 function updateHostRoot(wip: FiberNode, renderLane: Lane) {
 	const baseState = wip.memoizedState;
 	const updateQueue = wip.updateQueue as UpdateQueue<Element>;
 	const update = updateQueue.shared.pending;
 	updateQueue.shared.pending = null;
+	const prevChildren = wip.memoizedState;
 	const { memoizedState } = processUpdateQueue(baseState, update, renderLane);
 	wip.memoizedState = memoizedState;
 
+	const current = wip.alternate;
+	if (current !== null) {
+		if (!current.memoizedState) {
+			current.memoizedState = memoizedState;
+		}
+	}
+
 	const nextChildren = wip.memoizedState;
+	if (prevChildren === nextChildren) {
+		return bailoutOnAlreadyFinishedWork(wip, renderLane);
+	}
 	reconcilerChildren(wip, nextChildren);
 	return wip.child;
 }
@@ -79,6 +155,11 @@ function updateHostComponent(wip: FiberNode) {
 
 function updateFunctionComponent(wip: FiberNode, renderLane: Lane) {
 	const nextChildren = renderWithHooks(wip, renderLane);
+	const current = wip.alternate;
+	if (current !== null && !didReceiveUpdate) {
+		bailoutHook(wip, renderLane);
+		return bailoutOnAlreadyFinishedWork(wip, renderLane);
+	}
 	reconcilerChildren(wip, nextChildren);
 	return wip.child;
 }
