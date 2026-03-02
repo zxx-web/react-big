@@ -41,7 +41,7 @@ export interface Effect {
 	tag: FLags;
 	create: EffectCallback | void;
 	destroy: EffectCallback | void;
-	deps: EffectDeps;
+	deps: HookDeps;
 	next: Effect | null;
 }
 export interface FCUpdateQueue<T> extends UpdateQueue<T> {
@@ -49,7 +49,7 @@ export interface FCUpdateQueue<T> extends UpdateQueue<T> {
 	lastRenderedState: T;
 }
 type EffectCallback = () => void;
-type EffectDeps = any[] | null;
+export type HookDeps = any[] | null;
 export function renderWithHooks(
 	wip: FiberNode,
 	Component: FiberNode['type'],
@@ -83,7 +83,9 @@ const HooksDisptcherOnMount: Dispatcher = {
 	useTransition: mountTransition,
 	useRef: mountRef,
 	useContext: readContext,
-	use
+	use,
+	useCallback: mountCallback,
+	useMemo: mountMemo
 };
 
 const HooksDisptcherOnUpdate: Dispatcher = {
@@ -92,7 +94,9 @@ const HooksDisptcherOnUpdate: Dispatcher = {
 	useTransition: updateTransition,
 	useRef: updateRef,
 	useContext: readContext,
-	use
+	use,
+	useCallback: updateCallback,
+	useMemo: updateMemo
 };
 function readContext<T>(context: ReactContext<T>): T {
 	const consumer = currentlyRenderFiber;
@@ -112,7 +116,7 @@ function updateRef<T>(initialValue: T): { current: T } {
 	const hook = updateWorkInProgressHook();
 	return hook.memoizedState;
 }
-function mountEffect(create: EffectCallback | void, deps: EffectDeps | void) {
+function mountEffect(create: EffectCallback | void, deps: HookDeps | void) {
 	const hook = mountWorkInProgressHook();
 	const nextDeps = deps === undefined ? null : deps;
 	(currentlyRenderFiber as FiberNode).flags |= passiveEffect;
@@ -123,7 +127,7 @@ function mountEffect(create: EffectCallback | void, deps: EffectDeps | void) {
 		nextDeps
 	);
 }
-function updateEffect(create: EffectCallback | void, deps: EffectDeps | void) {
+function updateEffect(create: EffectCallback | void, deps: HookDeps | void) {
 	const hook = updateWorkInProgressHook();
 	const nextDeps = deps === undefined ? null : deps;
 	let destroy: EffectCallback | void;
@@ -147,7 +151,7 @@ function updateEffect(create: EffectCallback | void, deps: EffectDeps | void) {
 		);
 	}
 }
-function areHookInputsEqual(nextDeps: EffectDeps, prevDeps: EffectDeps) {
+function areHookInputsEqual(nextDeps: HookDeps, prevDeps: HookDeps) {
 	if (nextDeps === null || prevDeps === null) {
 		return false;
 	}
@@ -163,7 +167,7 @@ function pushEffect(
 	hookFlags: FLags,
 	create: EffectCallback | void,
 	destroy: EffectCallback | void,
-	deps: EffectDeps
+	deps: HookDeps
 ): Effect {
 	const effect: Effect = {
 		tag: hookFlags,
@@ -395,4 +399,48 @@ export function bailoutHook(wip: FiberNode, renderLane: Lane) {
 	wip.updateQueue = current.updateQueue;
 	wip.flags &= ~passiveEffect;
 	current.lanes = removeLanes(current.lanes, renderLane);
+}
+
+function mountCallback<T>(callback: T, deps: HookDeps | undefined): T {
+	const hook = mountWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	hook.memoizedState = [callback, nextDeps];
+	return callback;
+}
+
+function updateCallback<T>(callback: T, deps: HookDeps | undefined): T {
+	const hook = updateWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	const prevState = hook.memoizedState;
+	if (nextDeps !== null) {
+		const prevDeps = prevState[1];
+		if (areHookInputsEqual(nextDeps, prevDeps)) {
+			return prevState[0];
+		}
+	}
+	hook.memoizedState = [callback, nextDeps];
+	return callback;
+}
+
+function mountMemo<T>(nextCreate: () => T, deps: HookDeps | undefined): T {
+	const hook = mountWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	const nextValue = nextCreate();
+	hook.memoizedState = [nextValue, nextDeps];
+	return nextValue;
+}
+
+function updateMemo<T>(nextCreate: () => T, deps: HookDeps | undefined): T {
+	const hook = updateWorkInProgressHook();
+	const nextDeps = deps === undefined ? null : deps;
+	const prevState = hook.memoizedState;
+	if (nextDeps !== null) {
+		const prevDeps = prevState[1];
+		if (areHookInputsEqual(nextDeps, prevDeps)) {
+			return prevState[0];
+		}
+	}
+	const nextValue = nextCreate();
+	hook.memoizedState = [nextValue, nextDeps];
+	return nextValue;
 }
