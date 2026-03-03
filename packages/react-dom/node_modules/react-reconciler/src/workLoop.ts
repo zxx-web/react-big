@@ -376,5 +376,14 @@ export function createWorkInProgress(
 	wip.ref = current.ref;
 	wip.lanes = current.lanes;
 	wip.childLanes = current.childLanes;
+
+	const currentDeps = current.dependencies;
+	wip.dependencies =
+		currentDeps === null
+			? null
+			: {
+					firstContext: currentDeps.firstContext,
+					lanes: currentDeps.lanes
+				};
 	return wip;
 }

@@ -1,7 +1,24 @@
 import { ReactContext } from 'shared/ReactTypes';
+import { FiberNode } from './fiber';
+import {
+	includeSomeLanes,
+	isSubsetOfLanes,
+	Lane,
+	mergeLanes,
+	NoLanes
+} from './fiberLanes';
+import { markWipReceivedUpdate } from './beginWork';
+import { ContextProvider } from './workTag';
+
+export interface ContextItem<T> {
+	context: ReactContext<T>;
+	memoizedState: T;
+	next: ContextItem<T> | null;
+}
 
 let prevContextValue: any = null;
 const prevContextValueStack: any[] = [];
+let lastContextDep: ContextItem<any> | null = null;
 
 export function pushProvider<T>(context: ReactContext<T>, newValue: T) {
 	prevContextValueStack.push(prevContextValue);
@@ -12,4 +29,130 @@ export function pushProvider<T>(context: ReactContext<T>, newValue: T) {
 export function popProvider<T>(context: ReactContext<T>) {
 	context._currentValue = prevContextValue;
 	prevContextValue = prevContextValueStack.pop();
+}
+
+export function prepareToReadContext(wip: FiberNode, renderLane: Lane) {
+	lastContextDep = null;
+
+	const deps = wip.dependencies;
+	if (deps !== null) {
+		const firstContext = deps.firstContext;
+		if (firstContext !== null) {
+			if (includeSomeLanes(deps.lanes, renderLane)) {
+				markWipReceivedUpdate();
+			}
+			deps.firstContext = null;
+		}
+	}
+}
+
+export function readContext<T>(
+	consumer: FiberNode | null,
+	context: ReactContext<T>
+): T {
+	if (consumer === null) {
+		throw new Error('只能在函数组件中使用useContext');
+	}
+	const value = context._currentValue;
+	const contextItem: ContextItem<any> = {
+		context,
+		memoizedState: value,
+		next: null
+	};
+	if (lastContextDep === null) {
+		lastContextDep = contextItem;
+		consumer.dependencies = {
+			firstContext: contextItem,
+			lanes: NoLanes
+		};
+	} else {
+		lastContextDep = lastContextDep.next = contextItem;
+	}
+	return value;
+}
+
+export function propagateContextChange<T>(
+	wip: FiberNode,
+	context: ReactContext<T>,
+	renderLane: Lane
+) {
+	let fiber = wip.child;
+	if (fiber !== null) {
+		fiber.return = wip;
+	}
+	while (fiber !== null) {
+		let nextFiber = null;
+		const deps = fiber.dependencies;
+		if (deps !== null) {
+			nextFiber = fiber.child;
+			let contextItem = deps.firstContext;
+			while (contextItem !== null) {
+				if (contextItem.context === context) {
+					fiber.lanes = mergeLanes(fiber.lanes, renderLane);
+					const alternate = fiber.alternate;
+					if (alternate !== null) {
+						alternate.lanes = mergeLanes(alternate.lanes, renderLane);
+					}
+					deps.lanes = mergeLanes(deps.lanes, renderLane);
+					scheduleContextWorkOnParentPath(fiber.return, wip, renderLane);
+					break;
+				}
+				contextItem = contextItem.next;
+			}
+		} else if (fiber.tag === ContextProvider) {
+			nextFiber = fiber.type === wip.type ? null : fiber.child;
+		} else {
+			nextFiber = fiber.child;
+		}
+
+		if (nextFiber !== null) {
+			nextFiber.return = fiber;
+		} else {
+			nextFiber = fiber;
+			while (nextFiber !== null) {
+				if (nextFiber === wip) {
+					nextFiber = null;
+					break;
+				}
+				let sibling = nextFiber.sibling;
+				if (sibling !== null) {
+					sibling.return = nextFiber.return;
+					nextFiber = sibling;
+					break;
+				}
+				nextFiber = nextFiber.return;
+			}
+		}
+		fiber = nextFiber;
+	}
+}
+
+function scheduleContextWorkOnParentPath(
+	from: FiberNode | null,
+	to: FiberNode,
+	renderLane: Lane
+) {
+	let node = from;
+
+	while (node !== null) {
+		const alternate = node.alternate;
+
+		if (!isSubsetOfLanes(node.childLanes, renderLane)) {
+			node.childLanes = mergeLanes(node.childLanes, renderLane);
+			if (alternate !== null) {
+				alternate.childLanes = mergeLanes(alternate.childLanes, renderLane);
+			}
+		} else if (
+			alternate !== null &&
+			!isSubsetOfLanes(alternate.childLanes, renderLane)
+		) {
+			alternate.childLanes = mergeLanes(alternate.childLanes, renderLane);
+		}
+
+		if (node === to) {
+			break;
+		}
+
+		node = node.return;
+	}
 }

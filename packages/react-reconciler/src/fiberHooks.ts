@@ -24,12 +24,18 @@ import { hookHasEffect, passive } from './hookEffectTags';
 import { REACT_CONTEXT_TYPE } from 'shared/ReactSymbols';
 import { trackUsedThenable } from './thenable';
 import { markWipReceivedUpdate } from './beginWork';
+import { readContext as readContextOrigin } from './fiberContext';
 
 let currentlyRenderFiber: FiberNode | null = null;
 let workInProgressHook: Hook | null = null;
 let currentHook: Hook | null = null;
 let renderLane: Lane = NoLane;
 const { currentDispatcher, CurrentBatchConfig } = internals;
+
+function readContext<T>(context: ReactContext<T>): T {
+	return readContextOrigin(currentlyRenderFiber, context);
+}
+
 interface Hook {
 	memoizedState: any;
 	updateQueue: unknown;
@@ -98,14 +104,7 @@ const HooksDisptcherOnUpdate: Dispatcher = {
 	useCallback: updateCallback,
 	useMemo: updateMemo
 };
-function readContext<T>(context: ReactContext<T>): T {
-	const consumer = currentlyRenderFiber;
-	if (consumer === null) {
-		throw new Error('只能在函数组件中使用useContext');
-	}
-	const value = context._currentValue;
-	return value;
-}
+
 function mountRef<T>(initialValue: T): { current: T } {
 	const hook = mountWorkInProgressHook();
 	const ref = { current: initialValue };
